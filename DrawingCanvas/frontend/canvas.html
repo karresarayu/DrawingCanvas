@@ -2,38 +2,77 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Canvas</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drawing Canvas</title>
+  <link rel="stylesheet" href="canvas.css">
 </head>
+<div class="custom-cursor" id="customCursor"></div>
+
 <body>
-  <div class="topbar">
-    <span id="welcome"></span>
-    <button id="logout">Logout</button>
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <!-- Left: Welcome -->
+    <div class="left-section">
+      <span id="userName">Welcome, User</span>
+    </div>
+
+    <!-- Center: Tools -->
+    <div class="toolbar-inline">
+      <button id="brushBtn" title="Brush">
+        <img src="./photos/brush.svg" alt="Brush" class="tool-icon">
+      </button>
+
+      <button id="eraserBtn" title="Eraser">
+        <img src="./photos/eraser.svg" alt="Eraser" class="tool-icon">
+      </button>
+
+      <label for="colorPicker">Color:</label>
+      <input type="color" id="colorPicker" value="#000000">
+
+      <label for="strokeWidth">Size:</label>
+      <input type="range" id="strokeWidth" min="1" max="30" value="5">
+
+      <button id="undoBtn" title="Undo">
+        <img src="./photos/undo.svg" alt="Undo" class="tool-icon">
+      </button>
+
+      <button id="redoBtn" title="Redo">
+        <img src="./photos/redo.svg" alt="Redo" class="tool-icon">
+      </button>
+
+      <button id="clearBtn" title="Clear">
+        <img src="./photos/circle.svg" alt="Clear" class="tool-icon">
+      </button>
+    </div>
+
+    <!-- Right: Logout -->
+    <div class="right-section">
+      <button id="logoutBtn">Logout</button>
+    </div>
+  </header>
+
+  <!-- Canvas -->
+  <div class="canvas-container">
+    <canvas id="drawingCanvas" width="1300" height="650"></canvas>
   </div>
 
-  <canvas id="draw" width="1200" height="700" style="border:1px solid #ccc;"></canvas>
-
+  <!-- Script -->
   <script>
-    const user = JSON.parse(localStorage.getItem("user") || "null");
     const token = localStorage.getItem("token");
-
+    const user = JSON.parse(localStorage.getItem("user"));
     if (!token || !user) {
       window.location.href = "login.html";
+    } else {
+      document.getElementById("userName").innerText = `Welcome, ${user.name}`;
     }
 
-    document.getElementById("welcome").innerText = `Welcome, ${user.name}!`;
-    document.getElementById("logout").addEventListener("click", () => {
+    document.getElementById("logoutBtn").addEventListener("click", () => {
       localStorage.clear();
       window.location.href = "login.html";
     });
-
-    // test user color
-    const ctx = document.getElementById("draw").getContext("2d");
-    ctx.fillStyle = user.color || "#333";
-    ctx.fillRect(10, 10, 100, 30);
-    ctx.fillStyle = "#fff";
-    ctx.font = "14px sans-serif";
-    ctx.fillText(user.name, 20, 30);
   </script>
+
+  <script src="./js/canvas.js"></script>
 </body>
 </html>

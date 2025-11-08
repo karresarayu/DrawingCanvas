@@ -1,0 +1,155 @@
+/* ====== General Layout ====== */
+body {
+  background: url("../photos/wallpaper.png") no-repeat center center fixed;
+  background-size: cover;
+  font-family: "Poppins", sans-serif;
+  color: #000;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* ====== Header (Topbar) ====== */
+.topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr; /* Left | Center | Right */
+  align-items: center;
+  background: #fff;
+  padding: 15px 30px;
+  border-bottom: 2px solid #000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 10;
+}
+
+/* ====== Left Section ====== */
+.left-section {
+  justify-self: start;
+}
+
+#userName {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* ====== Center Toolbar ====== */
+.toolbar-inline {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.toolbar-inline label {
+  font-weight: 600;
+}
+
+.toolbar-inline button {
+  background: transparent;
+  border: 2px solid #000;
+  color: #000;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbar-inline button:hover {
+  background: #000;
+}
+
+.toolbar-inline button:hover .tool-icon {
+  filter: invert(1);
+}
+
+/* SVG Icon Styling */
+.tool-icon {
+  width: 20px;
+  height: 20px;
+  filter: invert(0); /* keeps them black */
+  transition: 0.2s;
+}
+
+/* Inputs */
+input[type="color"],
+input[type="range"] {
+  cursor: pointer;
+}
+
+/* ====== Right Section ====== */
+.right-section {
+  justify-self: end;
+}
+
+#logoutBtn {
+  background: #000;
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+#logoutBtn:hover {
+  background: #333;
+}
+
+/* ====== Canvas Area ====== */
+.canvas-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: calc(100vh - 100px);
+  background: #f9f9f9;
+  padding: 10px;
+}
+
+canvas {
+  border: 3px solid #000;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  
+}
+
+/* ====== Responsive ====== */
+@media (max-width: 1100px) {
+  .topbar {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .toolbar-inline {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .right-section {
+    justify-self: center;
+  }
+
+  canvas {
+    width: 95%;
+    height: auto;
+  }
+}
+
+/* ===== Custom Brush Cursor ===== */
+.custom-cursor {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #000;
+  border-radius: 50%;
+  pointer-events: none; /* So it doesn't block drawing */
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  display: none; /* hidden until mouse enters canvas */
+}
+

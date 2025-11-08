@@ -7,7 +7,7 @@
 
 body {
   font-family: "Poppins", sans-serif;
-  background: url("./photos/wallpaper.webp") no-repeat center center fixed;
+  background: url("./photos/ChatGPT Image Nov 8, 2025, 03_31_07 AM.png") no-repeat center center fixed;
   background-size: cover;
   min-height: 100vh;
   display: flex;
@@ -16,7 +16,7 @@ body {
   color: #000;
 }
 
-/* Light overlay for contrast */
+/* Light overlay for contrast
 body::before {
   content: "";
   position: fixed;
@@ -26,17 +26,17 @@ body::before {
   height: 100%;
   background: rgba(255, 255, 255, 0.6);
   z-index: 0;
-}
+} */
 
 /* Center container */
 .main-container {
   position: relative;
   z-index: 1;
   text-align: center;
-  background: rgba(255, 255, 255, 0.8);
+  background: #ffffff; /* pure white */
   padding: 60px 80px;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   width: 600px;
   max-width: 90%;
 }
@@ -108,10 +108,10 @@ body::before {
 /* ---------- AUTH PAGES (Login & Register) ---------- */
 
 .auth-container {
-  background: rgba(255, 255, 255, 0.85);
+  background: #ffffff; /* pure white */
   padding: 50px 60px;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   text-align: center;
   width: 500px;
   max-width: 90%;
