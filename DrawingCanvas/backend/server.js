@@ -18,76 +18,66 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Resolve __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// MongoDB Connection
+// ===== MongoDB Connection =====
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
+  .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// API routes
+// ===== API Routes =====
 app.use("/api/auth", authRoutes);
 
-// Serve frontend
+// ===== Serve Frontend =====
 app.use(express.static(path.join(__dirname, "../frontend")));
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 
-// Create HTTP server and Socket.io
+// ===== HTTP + WebSocket Setup =====
 const httpServer = http.createServer(app);
-const io = new IOServer(httpServer, {
-  cors: { origin: "*" }, // allow frontend requests
-});
+const io = new IOServer(httpServer, { cors: { origin: "*" } });
 
-// ===== In-memory stores =====
-const actions = []; // all strokes on canvas
-const allSavedStrokes = {}; // all strokes ever drawn (for redo)
-const userActions = {}; // per-user stack of stroke IDs
-const redoStacks = {}; // per-user redo stack
+// ===== Global Canvas State =====
+let actions = []; // all drawn strokes
+let redoStack = []; // undone strokes kept here
+const allStrokes = {}; // quick stroke lookup
 
-// ===== Helper: Verify token during socket handshake =====
+// ===== Verify Socket Token =====
 async function verifyTokenSocket(token) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).lean();
     return user || null;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
 
-// ===== Socket Authentication =====
 io.use(async (socket, next) => {
-  try {
-    const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error("Unauthorized"));
-    const user = await verifyTokenSocket(token);
-    if (!user) return next(new Error("Unauthorized"));
-    socket.user = {
-      id: user._id.toString(),
-      name: user.name,
-      color:
-        user.color ||
-        "#" + Math.floor(Math.random() * 16777215).toString(16),
-    };
-    next();
-  } catch (err) {
-    next(new Error("Unauthorized"));
-  }
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error("Unauthorized"));
+  const user = await verifyTokenSocket(token);
+  if (!user) return next(new Error("Unauthorized"));
+
+  socket.user = {
+    id: user._id.toString(),
+    name: user.name,
+    color: "#" + Math.floor(Math.random() * 16777215).toString(16),
+  };
+  next();
 });
 
 // ===== Socket Connections =====
 io.on("connection", (socket) => {
-  console.log(`✅ ${socket.user.name} connected (${socket.id})`);
+  console.log(`🎨 ${socket.user.name} connected`);
 
-  // Send current history to new user
+  // Send full canvas history to new user
   socket.emit("history", actions);
 
-  // ===== When user draws a stroke =====
+  // ===== When a user draws =====
   socket.on("stroke", (stroke) => {
     if (!stroke.id) stroke.id = `${socket.id}_${Date.now()}`;
     stroke.userId = socket.user.id;
@@ -95,91 +85,63 @@ io.on("connection", (socket) => {
     stroke.color = stroke.color || socket.user.color || "#000";
     stroke.width = stroke.width || 3;
 
-    // store stroke globally
+    // Save globally
     actions.push(stroke);
-    allSavedStrokes[stroke.id] = stroke;
+    allStrokes[stroke.id] = stroke;
 
-    // track this user’s strokes
-    userActions[stroke.userId] = userActions[stroke.userId] || [];
-    userActions[stroke.userId].push(stroke.id);
+    // ❌ Don't clear redoStack here
+    // redoStack = [];
 
-    // new stroke clears redo stack for this user
-    redoStacks[stroke.userId] = [];
-
-    // broadcast to others (real-time)
+    // Broadcast to all other users
     socket.broadcast.emit("stroke", stroke);
   });
 
-  // ===== Undo (per user) =====
+  // ===== Global Undo (remove last global stroke) =====
   socket.on("undo", () => {
-    const uid = socket.user.id;
-    const ulist = userActions[uid] || [];
-    if (ulist.length === 0) {
+    if (actions.length === 0) {
       socket.emit("undo-empty");
       return;
     }
 
-    // pop user’s last stroke ID
-    const lastStrokeId = ulist.pop();
+    const lastStroke = actions.pop();
+    redoStack.push(lastStroke);
+    delete allStrokes[lastStroke.id];
 
-    // push to redo stack
-    redoStacks[uid] = redoStacks[uid] || [];
-    redoStacks[uid].push(lastStrokeId);
-
-    // remove from global canvas
-    const idx = actions.findIndex((s) => s.id === lastStrokeId);
-    if (idx !== -1) actions.splice(idx, 1);
-
-    // broadcast updated canvas
-    io.emit("history", actions);
+    // Tell everyone to remove it
+    io.emit("remove-stroke", lastStroke.id);
   });
 
-  // ===== Redo (per user) =====
+  // ===== Global Redo (restore last undone) =====
   socket.on("redo", () => {
-    const uid = socket.user.id;
-    const rstack = redoStacks[uid] || [];
-    if (rstack.length === 0) {
+    if (redoStack.length === 0) {
       socket.emit("redo-empty");
       return;
     }
 
-    const strokeId = rstack.pop();
-    const stroke = allSavedStrokes[strokeId];
-    if (!stroke) {
-      socket.emit("redo-failed");
-      return;
-    }
-
-    // restore stroke globally
+    const stroke = redoStack.pop();
     actions.push(stroke);
-    userActions[uid] = userActions[uid] || [];
-    userActions[uid].push(strokeId);
+    allStrokes[stroke.id] = stroke;
 
-    // broadcast updated canvas
-    io.emit("history", actions);
+    // Tell everyone to re-draw it
+    io.emit("stroke", stroke);
   });
 
-  // ===== Clear Canvas (global for now) =====
+  // ===== Clear Canvas (global) =====
   socket.on("clear", () => {
-    for (const s of actions) {
-      redoStacks[s.userId] = redoStacks[s.userId] || [];
-      redoStacks[s.userId].push(s.id);
-    }
-    actions.length = 0;
+    redoStack = [...actions, ...redoStack];
+    actions = [];
     io.emit("history", actions);
   });
 
-  // ===== Cursor Position =====
+  // ===== Cursor Tracking =====
   socket.on("cursor", (pos) => {
-    const payload = {
+    socket.broadcast.emit("cursor", {
       socketId: socket.id,
-      userId: socket.user.id,
       userName: socket.user.name,
       color: socket.user.color,
       x: pos.x,
       y: pos.y,
-    };
-    socket.broadcast.emit("cursor", payload);
+    });
   });
 
   socket.on("disconnect", () => {
@@ -189,6 +151,4 @@ io.on("connection", (socket) => {
 
 // ===== Start Server =====
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+httpServer.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

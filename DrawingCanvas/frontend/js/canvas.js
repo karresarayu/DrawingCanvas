@@ -1,20 +1,18 @@
 // frontend/js/canvas.js
-// Assumes canvas.html provides elements with ids used below
 
-// Auth check
+// ===== Authentication Check =====
 const token = localStorage.getItem("token");
 const user = JSON.parse(localStorage.getItem("user") || "null");
-if (!token || !user) {
-  window.location.href = "login.html";
-}
+if (!token || !user) window.location.href = "login.html";
 
+// ===== Display User Info =====
 document.getElementById("userName").innerText = `Welcome, ${user.name}`;
 document.getElementById("logoutBtn").addEventListener("click", () => {
   localStorage.clear();
   window.location.href = "login.html";
 });
 
-// Canvas setup
+// ===== Canvas Setup =====
 const canvas = document.getElementById("drawingCanvas");
 const ctx = canvas.getContext("2d");
 canvas.width = canvas.clientWidth;
@@ -25,60 +23,42 @@ let tool = "brush";
 let brushColor = "#000000";
 let brushSize = 5;
 let localPoints = [];
-let lastEmit = 0;
-const EMIT_INTERVAL = 40; // ms
-let clientActions = []; // mirror of server history
+let clientActions = [];
 
-// custom cursor element
 const customCursor = document.getElementById("customCursor");
 
-// connect socket.io with token
-const socket = io({
-  auth: { token }
-});
+// ===== Socket.io Connection =====
+const socket = io({ auth: { token } });
 
 socket.on("connect_error", (err) => {
-  console.error("Socket connect error:", err.message);
+  console.error("Socket connection error:", err.message);
 });
 
+// ===== Handle Canvas History =====
 socket.on("history", (serverActions) => {
   clientActions = serverActions.slice();
-  redrawFromActions();
+  redrawCanvas();
 });
 
+// ===== Receive a Stroke from Others =====
 socket.on("stroke", (stroke) => {
-  // draw final stroke from other user
-  drawStrokeOnCanvas(stroke, false);
+  drawStroke(stroke);
   clientActions.push(stroke);
 });
 
-socket.on("stroke-progress", (partial) => {
-  // render preview: redraw everything + partial on top
-  redrawFromActions(partial);
+// ===== Handle Undo (Remove Stroke) =====
+socket.on("remove-stroke", (strokeId) => {
+  clientActions = clientActions.filter((s) => s.id !== strokeId);
+  redrawCanvas();
 });
 
-socket.on("cursor", (payload) => {
-  showRemoteCursor(payload);
-});
+// ===== Remote Cursor =====
+socket.on("cursor", (payload) => showRemoteCursor(payload));
+socket.on("user-disconnected", (id) => removeRemoteCursor(id));
 
-socket.on("presence", (list) => {
-  // optional: you can show online user list
-  // console.log("presence:", list);
-});
-
-socket.on("user-disconnected", (socketId) => {
-  removeRemoteCursor(socketId);
-});
-
-// Drawing helpers
-function redrawFromActions(preview = null) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (const s of clientActions) drawStrokeOnCanvas(s, false);
-  if (preview) drawStrokeOnCanvas(preview, true);
-}
-
-function drawStrokeOnCanvas(stroke, isPreview) {
-  if (!stroke || !stroke.points || stroke.points.length === 0) return;
+// ===== Drawing Functions =====
+function drawStroke(stroke) {
+  if (!stroke?.points?.length) return;
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -91,33 +71,33 @@ function drawStrokeOnCanvas(stroke, isPreview) {
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
   ctx.stroke();
   ctx.closePath();
-
-  if (!isPreview) {
-    // ensure not duplicated in clientActions
-    if (!clientActions.find(s => s.id === stroke.id)) clientActions.push(stroke);
-  }
   ctx.restore();
 }
 
-// utilities
+function redrawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const stroke of clientActions) drawStroke(stroke);
+}
+
+// ===== Get Pointer Position =====
 function getPointerPos(e) {
   const rect = canvas.getBoundingClientRect();
   return [e.clientX - rect.left, e.clientY - rect.top];
 }
 
-// drawing event handlers
+// ===== Drawing Events =====
 function startDraw(e) {
   painting = true;
   localPoints = [];
   const p = getPointerPos(e);
   localPoints.push(p);
+
   ctx.beginPath();
   ctx.moveTo(p[0], p[1]);
   ctx.lineWidth = brushSize;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.strokeStyle = (tool === "brush") ? brushColor : "#fff";
-  // clear redo if you want server to handle redo stack; we just notify server by action
+  ctx.strokeStyle = tool === "brush" ? brushColor : "#fff";
 }
 
 function draw(e) {
@@ -126,100 +106,84 @@ function draw(e) {
   localPoints.push(p);
   ctx.lineTo(p[0], p[1]);
   ctx.stroke();
-
-  // throttle stroke-progress
-  const now = Date.now();
-  if (now - lastEmit > EMIT_INTERVAL) {
-    lastEmit = now;
-    socket.emit("stroke-progress", {
-      id: `${socket.id}_${Date.now()}`,
-      points: localPoints.slice(-40),
-      color: (tool === "brush") ? brushColor : "#fff",
-      width: brushSize
-    });
-  }
-
-  // emit cursor
   emitCursor(e);
 }
 
 function stopDraw(e) {
   if (!painting) return;
   painting = false;
-  // finalize stroke
+
   const stroke = {
     id: `${socket.id}_${Date.now()}`,
     points: localPoints.slice(),
-    color: (tool === "brush") ? brushColor : "#fff",
+    color: tool === "brush" ? brushColor : "#fff",
     width: brushSize,
-    userName: user.name
+    userName: user.name,
   };
-  // draw final locally (already drawn but ensure complete)
-  drawStrokeOnCanvas(stroke, false);
-  // send to server
+
+  drawStroke(stroke);
   socket.emit("stroke", stroke);
   localPoints = [];
 }
 
-// mouse & touch wiring
+// ===== Mouse Events =====
 canvas.addEventListener("mousedown", startDraw);
 canvas.addEventListener("mousemove", draw);
 window.addEventListener("mouseup", stopDraw);
 
-// touch support
-canvas.addEventListener("touchstart", (ev) => { ev.preventDefault(); startDraw(ev.touches[0]); }, { passive: false });
-canvas.addEventListener("touchmove", (ev) => { ev.preventDefault(); draw(ev.touches[0]); }, { passive: false });
-window.addEventListener("touchend", (ev) => { ev.preventDefault(); stopDraw(ev.changedTouches[0]); }, { passive: false });
+// ===== Touch Events =====
+canvas.addEventListener("touchstart", (e) => startDraw(e.touches[0]), { passive: false });
+canvas.addEventListener("touchmove", (e) => draw(e.touches[0]), { passive: false });
+canvas.addEventListener("touchend", (e) => stopDraw(e.changedTouches[0]), { passive: false });
 
-// tools wiring
-document.getElementById("brushBtn").addEventListener("click", () => { tool = "brush"; });
-document.getElementById("eraserBtn").addEventListener("click", () => { tool = "eraser"; });
-document.getElementById("colorPicker").addEventListener("input", (e) => { brushColor = e.target.value; customCursor.style.borderColor = brushColor; });
-document.getElementById("strokeWidth").addEventListener("input", (e) => { brushSize = Number(e.target.value); updateCustomCursorSize(brushSize); });
+// ===== Tool Buttons =====
+document.getElementById("brushBtn").addEventListener("click", () => (tool = "brush"));
+document.getElementById("eraserBtn").addEventListener("click", () => (tool = "eraser"));
+document.getElementById("colorPicker").addEventListener("input", (e) => {
+  brushColor = e.target.value;
+  customCursor.style.borderColor = brushColor;
+});
+document.getElementById("strokeWidth").addEventListener("input", (e) => {
+  brushSize = Number(e.target.value);
+  updateCursorSize(brushSize);
+});
 
 document.getElementById("undoBtn").addEventListener("click", () => socket.emit("undo"));
 document.getElementById("redoBtn").addEventListener("click", () => socket.emit("redo"));
 document.getElementById("clearBtn").addEventListener("click", () => socket.emit("clear"));
 
-// ----- Remote cursor visuals -----
-const remoteCursors = {}; // socketId -> element
+// ===== Remote Cursor =====
+const remoteCursors = {};
 
 function showRemoteCursor(payload) {
-  const id = payload.socketId;
-  let el = remoteCursors[id];
+  let el = remoteCursors[payload.socketId];
   if (!el) {
     el = document.createElement("div");
     el.className = "remote-cursor";
     el.innerHTML = `<div class="dot" style="background:${payload.color}"></div><div class="label">${payload.userName}</div>`;
     document.body.appendChild(el);
-    remoteCursors[id] = el;
+    remoteCursors[payload.socketId] = el;
   }
-  // position in page coordinates
   el.style.left = `${payload.x}px`;
   el.style.top = `${payload.y}px`;
 }
 
 function removeRemoteCursor(socketId) {
-  const el = remoteCursors[socketId];
-  if (el) {
-    el.remove();
+  if (remoteCursors[socketId]) {
+    remoteCursors[socketId].remove();
     delete remoteCursors[socketId];
   }
 }
 
-// emit cursor (throttled)
 let lastCursorEmit = 0;
 function emitCursor(e) {
   const now = Date.now();
   if (now - lastCursorEmit < 30) return;
   lastCursorEmit = now;
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX;
-  const y = e.clientY;
-  socket.emit("cursor", { x, y });
+  socket.emit("cursor", { x: e.clientX, y: e.clientY });
 }
 
-// ----- Custom brush cursor -----
+// ===== Custom Cursor =====
 canvas.addEventListener("mousemove", (e) => {
   const rect = canvas.getBoundingClientRect();
   if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
@@ -231,13 +195,12 @@ canvas.addEventListener("mousemove", (e) => {
   }
 });
 
-canvas.addEventListener("mouseleave", () => { customCursor.style.display = "none"; });
+canvas.addEventListener("mouseleave", () => (customCursor.style.display = "none"));
 
-function updateCustomCursorSize(size) {
+function updateCursorSize(size) {
   customCursor.style.width = `${size}px`;
   customCursor.style.height = `${size}px`;
   customCursor.style.borderWidth = size > 15 ? "2px" : "1.5px";
 }
-// set initial cursor size & color
-updateCustomCursorSize(brushSize);
+updateCursorSize(brushSize);
 customCursor.style.borderColor = brushColor;

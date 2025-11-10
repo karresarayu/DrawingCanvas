@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node backend/server.js",
+    "build": "echo \"no build step\"",
     "dev": "nodemon backend/server.js"
   },
   "keywords": [],
