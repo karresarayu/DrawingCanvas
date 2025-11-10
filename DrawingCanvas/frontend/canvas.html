@@ -1,78 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Drawing Canvas</title>
-  <link rel="stylesheet" href="canvas.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Canvas</title>
+  <link rel="stylesheet" href="canvas.css" />
 </head>
-<div class="custom-cursor" id="customCursor"></div>
-
 <body>
-
-  <!-- Topbar -->
   <header class="topbar">
-    <!-- Left: Welcome -->
     <div class="left-section">
       <span id="userName">Welcome, User</span>
     </div>
 
-    <!-- Center: Tools -->
     <div class="toolbar-inline">
-      <button id="brushBtn" title="Brush">
-        <img src="./photos/brush.svg" alt="Brush" class="tool-icon">
-      </button>
-
-      <button id="eraserBtn" title="Eraser">
-        <img src="./photos/eraser.svg" alt="Eraser" class="tool-icon">
-      </button>
-
+      <button id="brushBtn"><img src="./photos/brush.svg" class="tool-icon" alt="Brush"></button>
+      <button id="eraserBtn"><img src="./photos/eraser.svg" class="tool-icon" alt="Eraser"></button>
       <label for="colorPicker">Color:</label>
       <input type="color" id="colorPicker" value="#000000">
-
       <label for="strokeWidth">Size:</label>
       <input type="range" id="strokeWidth" min="1" max="30" value="5">
-
-      <button id="undoBtn" title="Undo">
-        <img src="./photos/undo.svg" alt="Undo" class="tool-icon">
-      </button>
-
-      <button id="redoBtn" title="Redo">
-        <img src="./photos/redo.svg" alt="Redo" class="tool-icon">
-      </button>
-
-      <button id="clearBtn" title="Clear">
-        <img src="./photos/circle.svg" alt="Clear" class="tool-icon">
-      </button>
+      <button id="undoBtn"><img src="./photos/undo.svg" class="tool-icon" alt="Undo"></button>
+      <button id="redoBtn"><img src="./photos/redo.svg" class="tool-icon" alt="Redo"></button>
+      <button id="clearBtn"><img src="./photos/circle.svg" class="tool-icon" alt="Clear"></button>
     </div>
 
-    <!-- Right: Logout -->
     <div class="right-section">
       <button id="logoutBtn">Logout</button>
     </div>
   </header>
 
-  <!-- Canvas -->
   <div class="canvas-container">
     <canvas id="drawingCanvas" width="1300" height="650"></canvas>
   </div>
 
-  <!-- Script -->
-  <script>
-    const token = localStorage.getItem("token");
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (!token || !user) {
-      window.location.href = "login.html";
-    } else {
-      document.getElementById("userName").innerText = `Welcome, ${user.name}`;
-    }
+  <div class="custom-cursor" id="customCursor"></div>
 
-    document.getElementById("logoutBtn").addEventListener("click", () => {
-      localStorage.clear();
-      window.location.href = "login.html";
-    });
-  </script>
-
+  <!-- Socket.io client served by the server -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- Then your canvas logic -->
   <script src="./js/canvas.js"></script>
 </body>
 </html>

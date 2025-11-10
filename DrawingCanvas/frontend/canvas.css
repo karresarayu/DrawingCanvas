@@ -153,3 +153,27 @@ canvas {
   display: none; /* hidden until mouse enters canvas */
 }
 
+/* remote cursor popup */
+.remote-cursor {
+  position: fixed;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  background: rgba(255,255,255,0.9);
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+.remote-cursor .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.remote-cursor .label {
+  color: #000;
+  font-weight: 600;
+}
